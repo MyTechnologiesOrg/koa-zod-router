@@ -1,4 +1,7 @@
 import assert from 'assert';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, it } from 'node:test';
 import { createRouteSpec, methods, zFile } from '../src/util';
 import KoaRouter from '@koa/router';
@@ -727,6 +730,89 @@ describe('zodRouter', () => {
           assert(res.body.date === queryDate);
         });
     });
+
+    it('should remove body and query keys the schema strips', async () => {
+      const router = zodRouter();
+
+      router.post(
+        '/',
+        (ctx) => {
+          ctx.body = { body: ctx.request.body, query: ctx.request.query };
+        },
+        {
+          body: z.object({ name: z.string() }),
+          query: z.object({ page: z.coerce.number() }),
+        },
+      );
+
+      const app = createApp(router);
+
+      const res = await request(app).post('/?page=2&isAdmin=true').send({ name: 'eve', role: 'admin' });
+
+      assert.deepStrictEqual(res.body, { body: { name: 'eve' }, query: { page: 2 } });
+    });
+
+    it('should replace the body with the output of a transform', async () => {
+      const router = zodRouter();
+
+      router.post(
+        '/',
+        (ctx) => {
+          ctx.body = ctx.request.body;
+        },
+        {
+          body: z
+            .object({ email: z.string(), password: z.string() })
+            .transform(({ email, password }) => ({ email, passwordLength: password.length })),
+        },
+      );
+
+      const app = createApp(router);
+
+      const res = await request(app).post('/').send({ email: 'eve@example.com', password: 'hunter2' });
+
+      assert.deepStrictEqual(res.body, { email: 'eve@example.com', passwordLength: 7 });
+    });
+
+    it('should accept bodies that are not objects', async () => {
+      const router = zodRouter();
+
+      router.post(
+        '/',
+        (ctx) => {
+          ctx.body = { total: ctx.request.body.reduce((sum, n) => sum + n, 0) };
+        },
+        { body: z.array(z.coerce.number()) },
+      );
+
+      const app = createApp(router);
+
+      const res = await request(app).post('/').send(['1', '2', 3]);
+
+      assert.deepStrictEqual(res.body, { total: 6 });
+    });
+
+    it('should keep headers and params the schema does not cover', async () => {
+      const router = zodRouter();
+
+      router.get(
+        '/:id/:slug',
+        (ctx) => {
+          const { slug } = ctx.request.params as Record<string, unknown>;
+          ctx.body = { id: ctx.request.params.id, slug, accept: ctx.request.headers.accept };
+        },
+        {
+          params: z.object({ id: z.coerce.number() }),
+          headers: z.object({ 'x-test': z.string() }),
+        },
+      );
+
+      const app = createApp(router);
+
+      const res = await request(app).get('/1/hello').set('x-test', 'yes').set('accept', 'application/json');
+
+      assert.deepStrictEqual(res.body, { id: 1, slug: 'hello', accept: 'application/json' });
+    });
   });
 
   describe('options', () => {
@@ -960,6 +1046,88 @@ describe('zodRouter', () => {
       assert(res.body?.error?.issues === undefined);
       assert(res.status === 400);
     });
+
+    it('continueOnError: true - should apply the response schema to successful responses', async () => {
+      const router = zodRouter();
+
+      router.get(
+        '/',
+        (ctx) => {
+          const user = { id: 1, passwordHash: 'secret' };
+          ctx.body = user;
+        },
+        {
+          continueOnError: true,
+          query: z.object({ fields: z.enum(['basic', 'full']).optional() }),
+          response: z.object({ id: z.number() }),
+        },
+      );
+
+      const app = createApp(router);
+
+      const res = await request(app).get('/?fields=invalid');
+
+      assert(res.status === 200);
+      assert.deepStrictEqual(res.body, { id: 1 });
+    });
+
+    it('validationErrorHandler - should apply the response schema when the request continues', async () => {
+      const validationErrorHandler: ValidationErrorHandler = async (_ctx, next) => {
+        await next();
+      };
+
+      const router = zodRouter({ zodRouter: { validationErrorHandler } });
+
+      router.get(
+        '/',
+        (ctx) => {
+          const user = { id: 1, passwordHash: 'secret' };
+          ctx.body = user;
+        },
+        {
+          query: z.object({ fields: z.enum(['basic', 'full']).optional() }),
+          response: z.object({ id: z.number() }),
+        },
+      );
+
+      const app = createApp(router);
+
+      const res = await request(app).get('/?fields=invalid');
+
+      assert(res.status === 200);
+      assert.deepStrictEqual(res.body, { id: 1 });
+    });
+
+    it('validationErrorHandler - should not apply the response schema to error responses', async () => {
+      const validationErrorHandler: ValidationErrorHandler = async (ctx, next) => {
+        if (ctx.invalid.error) {
+          ctx.status = 400;
+          ctx.body = { error: 'bad input' };
+        } else {
+          await next();
+        }
+      };
+
+      const router = zodRouter({ zodRouter: { validationErrorHandler } });
+
+      router.get(
+        '/',
+        (ctx) => {
+          ctx.body = { id: 1 };
+        },
+        {
+          query: z.object({ fields: z.enum(['basic', 'full']).optional() }),
+          response: z.object({ id: z.number() }),
+        },
+      );
+
+      const app = createApp(router);
+
+      const res = await request(app).get('/?fields=invalid');
+
+      assert(res.status === 400);
+      assert.deepStrictEqual(res.body, { error: 'bad input' });
+    });
   });
 
   describe('multipart', () => {
@@ -1103,6 +1271,112 @@ describe('zodRouter', () => {
         .then((res) => {
           assert(res.status === 500);
         });
+    });
+
+    it('should not save file parts for routes without a files schema', async () => {
+      const uploadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'koa-zod-router-'));
+      const router = zodRouter({ formidable: { uploadDir }, zodRouter: { enableMultipart: true } });
+
+      router.post(
+        '/',
+        (ctx) => {
+          ctx.body = { hello: ctx.request.body.hello, files: ctx.request.files };
+        },
+        { body: z.object({ hello: z.string() }) },
+      );
+
+      const app = createApp(router);
+
+      const res = await request(app).post('/').field('hello', 'world').attach('test_file', 'package.json');
+
+      assert(res.status === 200);
+      assert.deepStrictEqual(res.body, { hello: 'world', files: {} });
+      assert.deepStrictEqual(fs.readdirSync(uploadDir), []);
+      fs.rmSync(uploadDir, { recursive: true });
+    });
+
+    it('should run pre before parsing multipart requests', async () => {
+      const router = zodRouter({ zodRouter: { enableMultipart: true } });
+      let filesSeenByPre: unknown = 'not called';
+
+      router.register({
+        method: 'post',
+        path: '/',
+        pre: async (ctx, next) => {
+          filesSeenByPre = ctx.request.files;
+          await next();
+        },
+        handler: (ctx) => {
+          ctx.status = 201;
+          ctx.body = { filename: ctx.request.files.test_file.toJSON().originalFilename };
+        },
+        validate: { files: z.object({ test_file: zFile() }) },
+      });
+
+      const app = createApp(router);
+
+      const res = await request(app).post('/').attach('test_file', 'package.json');
+
+      assert(filesSeenByPre === undefined);
+      assert(res.status === 201);
+      assert(res.body.filename === 'package.json');
+    });
+
+    it('should delete uploaded files after the response', async () => {
+      const uploadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'koa-zod-router-'));
+      const router = zodRouter({ formidable: { uploadDir }, zodRouter: { enableMultipart: true } });
+      let filepath = '';
+
+      router.register({
+        method: 'post',
+        path: '/',
+        handler: (ctx) => {
+          filepath = ctx.request.files.test_file.toJSON().filepath;
+          ctx.body = { existed: fs.existsSync(filepath) };
+        },
+        validate: { files: z.object({ test_file: zFile() }) },
+      });
+
+      const app = createApp(router);
+
+      const res = await request(app).post('/').attach('test_file', 'package.json');
+
+      // Files are unlinked asynchronously once the response closes
+      for (let i = 0; i < 100 && fs.existsSync(filepath); i++) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+
+      assert(res.body.existed === true);
+      assert(!fs.existsSync(filepath));
+      assert.deepStrictEqual(fs.readdirSync(uploadDir), []);
+      fs.rmSync(uploadDir, { recursive: true });
+    });
+
+    it('use specs that do not validate body or files should leave multipart parsing to the route', async () => {
+      const router = zodRouter({ zodRouter: { enableMultipart: true } });
+
+      router.use({
+        handler: async (_ctx, next) => {
+          await next();
+        },
+        validate: { headers: z.object({ 'x-api-key': z.string() }) },
+      });
+
+      router.register({
+        method: 'post',
+        path: '/',
+        handler: (ctx) => {
+          ctx.body = { filename: ctx.request.files.test_file.toJSON().originalFilename };
+        },
+        validate: { files: z.object({ test_file: zFile() }) },
+      });
+
+      const app = createApp(router);
+
+      const res = await request(app).post('/').set('x-api-key', 'key').attach('test_file', 'package.json');
+
+      assert(res.status === 200);
+      assert(res.body.filename === 'package.json');
     });
   });
 });

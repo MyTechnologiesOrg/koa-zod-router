@@ -46,6 +46,20 @@ const addParsedProps = (ctxProp: Record<string, any>, parsed?: Record<string, an
   }
 };
 
+// Like addParsedProps, but also deletes keys the schema stripped or transformed
+// away so they can't reach handlers. Works in place because Koa caches the
+// ctx.request.query object and its setter would stringify coerced values.
+const replaceParsedProps = (ctxProp: Record<string, any>, parsed?: Record<string, any> | ZodError<unknown>) => {
+  if (parsed && !(parsed instanceof ZodError)) {
+    Object.keys(ctxProp).forEach((k) => {
+      if (!Object.hasOwn(parsed, k)) {
+        delete ctxProp[k];
+      }
+    });
+  }
+  addParsedProps(ctxProp, parsed);
+};
+
 export const validationMiddleware = <H, P, Q, B, F, R>(
   validation?: ValidationOptions<H, P, Q, B, F, R>,
   opts?: RouterOpts['zodRouter'],
@@ -74,13 +88,12 @@ export const validationMiddleware = <H, P, Q, B, F, R>(
       { error: false },
     );
 
-    if (inputErrors.body || inputErrors.files || inputErrors.headers || inputErrors.params || inputErrors.query) {
-      if (validation?.continueOnError || opts?.validationErrorHandler) {
-        inputErrors.error = true;
-        ctx.invalid = inputErrors;
-        await next();
-        return;
-      } else if (opts?.exposeRequestErrors) {
+    const hasInputErrors = Boolean(
+      inputErrors.body || inputErrors.files || inputErrors.headers || inputErrors.params || inputErrors.query,
+    );
+
+    if (hasInputErrors && !validation.continueOnError && !opts?.validationErrorHandler) {
+      if (opts?.exposeRequestErrors) {
         ctx.response.status = 400;
         ctx.type = 'json';
         ctx.body = { error: serializeInvalid(inputErrors) };
@@ -91,17 +104,34 @@ export const validationMiddleware = <H, P, Q, B, F, R>(
       }
     }
 
-    ctx.invalid = { error: false };
+    if (hasInputErrors) {
+      inputErrors.error = true;
+      ctx.invalid = inputErrors;
+    } else {
+      ctx.invalid = { error: false };
 
-    const [headers, params, query, body, files] = validated;
+      const [headers, params, query, body, files] = validated;
 
-    addParsedProps(ctx.request.headers, headers);
-    addParsedProps(ctx.request.params, params);
-    addParsedProps(ctx.request.query, query);
-    addParsedProps(ctx.request.body, body);
-    addParsedProps(ctx.request.files, files);
+      // Headers and params are merged: other middleware relies on the full
+      // header set, and params come from the route pattern, not the client.
+      addParsedProps(ctx.request.headers, headers);
+      addParsedProps(ctx.request.params, params);
+      replaceParsedProps(ctx.request.query, query);
+      if (validation.body) {
+        ctx.request.body = body;
+      }
+      if (validation.files) {
+        ctx.request.files = files;
+      }
+    }
 
     await next();
+
+    // After invalid input, the error handling may send its own error response or
+    // redirect; only a successful response still has to match the schema.
+    if (hasInputErrors && (ctx.status < 200 || ctx.status >= 300)) {
+      return;
+    }
 
     const output = await validate<R>(ctx.body, validation.response, 'response');
 
