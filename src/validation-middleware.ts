@@ -33,9 +33,12 @@ const validate = async <T>(
 // Serialize explicitly to keep the `{ issues, name }` shape Zod 3 produced.
 const serializeError = (error: ZodError) => ({ issues: error.issues, name: error.name });
 
+// Only the per-scope ZodErrors; the `error` flag is for `ctx.invalid` and is always false in a 400 body.
 const serializeInvalid = <H, P, Q, B, F>(invalid: ZodRouterInvalid<H, P, Q, B, F>) =>
   Object.fromEntries(
-    Object.entries(invalid).map(([key, value]) => [key, value instanceof ZodError ? serializeError(value) : value]),
+    Object.entries(invalid).flatMap(([key, value]) =>
+      value instanceof ZodError ? [[key, serializeError(value)]] : [],
+    ),
   );
 
 const addParsedProps = (ctxProp: Record<string, any>, parsed?: Record<string, any> | ZodError<unknown>) => {

@@ -1073,6 +1073,7 @@ describe('zodRouter', () => {
       assert(res.body?.error?.headers.issues.length === 1);
       assert(res.body?.error?.query.issues.length === 1);
       assert(res.body?.error?.body.issues.length === 2);
+      assert.deepStrictEqual(Object.keys(res.body.error).sort(), ['body', 'headers', 'query']);
       assert(res.status === 400);
     });
 
