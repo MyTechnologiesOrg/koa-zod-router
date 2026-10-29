@@ -7,7 +7,7 @@ Inspired by koa-joi-router, this package aims to provide a similar feature-set w
 ![downloads](https://img.shields.io/npm/dm/koa-zod-router)
 
 [zod]: https://github.com/colinhacks/zod
-[coercion]: https://zod.dev/?id=coercion-for-primitives
+[coercion]: https://zod.dev/api#coercion
 [koa-bodyparser]: https://github.com/koajs/bodyparser
 [formidable]: https://github.com/node-formidable/formidable
 [@koa/router]: https://github.com/koajs/router
@@ -25,8 +25,10 @@ Inspired by koa-joi-router, this package aims to provide a similar feature-set w
 ## 🚀 Install
 
 ```sh
-npm install koa-zod-router
+npm install koa-zod-router koa zod
 ```
+
+Requires Node.js 24 or newer, [zod][] 4, and Koa 2. Version 2.x of this package supports Zod 3.
 
 ## 🚦 Quickstart
 
@@ -194,6 +196,27 @@ const router = zodRouter({
 });
 ```
 
+Each failing request parameter (or the response) is sent as `{ issues, name }`:
+
+```json
+{
+  "error": {
+    "error": false,
+    "body": {
+      "issues": [
+        {
+          "expected": "string",
+          "code": "invalid_type",
+          "path": ["foo"],
+          "message": "Invalid input: expected string, received undefined"
+        }
+      ],
+      "name": "ZodError"
+    }
+  }
+}
+```
+
 ### Type coercion
 
 When dealing with route parameters, query strings, and headers the incoming data will be parsed as strings to begin with. From a validation standpoint this can potentially be painful to deal with when dealing with things like `Date` in javascript. Luckily [zod] has a built in [coercion] method attached to its primitive data types to solve this!
@@ -312,7 +335,10 @@ router.register({
       if (ctx.invalid.error) {
         // destructure all of the ZodErrors from ctx.invalid
         const { body, headers, query, params, files } = ctx.invalid;
-        //... handle ZodErrors
+        // Zod 4 does not serialize `issues` with JSON.stringify, so read it directly
+        // or use z.treeifyError() / z.flattenError()
+        ctx.status = 400;
+        ctx.body = { body: body?.issues };
       } else {
         await next();
       }

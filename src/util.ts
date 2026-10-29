@@ -87,7 +87,7 @@ export const assertRouteFnSpec = <S, H, P, Q, B, F, R>(val: any): val is Spec<S,
 
   return false;
 };
-export const zFile = (): z.ZodType<PersistentFile, z.ZodTypeDef, PersistentFile> => {
+export const zFile = (): z.ZodType<PersistentFile, PersistentFile> => {
   return z.instanceof(formidable.PersistentFile).or(z.instanceof(formidable.VolatileFile));
 };
 

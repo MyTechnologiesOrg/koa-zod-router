@@ -1,5 +1,5 @@
 import { DefaultContext, Next } from 'koa';
-import { ZodError, ZodTypeAny } from 'zod';
+import { ZodError, ZodType } from 'zod';
 import { ValidationOptions, RouterOpts, ZodValidationError, ZodRouterInvalid } from './types';
 import { assertValidation, assertZodValidationError, noopMiddleware } from './util';
 
@@ -11,7 +11,7 @@ class ValidationError extends Error {
 
 const validate = async <T>(
   data: unknown,
-  schema: ZodTypeAny | undefined,
+  schema: ZodType<any, any> | undefined,
   requestParameter: string,
 ): Promise<ZodValidationError<T> | Record<string, any> | undefined> => {
   if (!schema) {
@@ -28,6 +28,15 @@ const validate = async <T>(
 
   return parsed.data;
 };
+
+// Zod 4 makes ZodError#issues non-enumerable, so JSON.stringify drops it.
+// Serialize explicitly to keep the `{ issues, name }` shape Zod 3 produced.
+const serializeError = (error: ZodError) => ({ issues: error.issues, name: error.name });
+
+const serializeInvalid = <H, P, Q, B, F>(invalid: ZodRouterInvalid<H, P, Q, B, F>) =>
+  Object.fromEntries(
+    Object.entries(invalid).map(([key, value]) => [key, value instanceof ZodError ? serializeError(value) : value]),
+  );
 
 const addParsedProps = (ctxProp: Record<string, any>, parsed?: Record<string, any> | ZodError<unknown>) => {
   if (parsed && !(parsed instanceof ZodError)) {
@@ -74,7 +83,7 @@ export const validationMiddleware = <H, P, Q, B, F, R>(
       } else if (opts?.exposeRequestErrors) {
         ctx.response.status = 400;
         ctx.type = 'json';
-        ctx.body = { error: inputErrors };
+        ctx.body = { error: serializeInvalid(inputErrors) };
         ctx.app.emit('error', new ValidationError({ inputErrors }), ctx);
         return;
       } else {
@@ -104,7 +113,7 @@ export const validationMiddleware = <H, P, Q, B, F, R>(
       if (opts?.exposeResponseErrors) {
         ctx.status = 500;
         ctx.type = 'json';
-        ctx.body = { error: { response: output.error } };
+        ctx.body = { error: { response: serializeError(output.error) } };
         ctx.app.emit('error', new ValidationError({ output }), ctx);
         return;
       }

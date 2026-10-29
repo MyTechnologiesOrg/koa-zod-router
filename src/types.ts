@@ -2,7 +2,7 @@ import KoaRouter, { LayerOptions, RouterOptions } from '@koa/router';
 import formidable from 'formidable';
 import { Context, DefaultState, Middleware, Request, Response } from 'koa';
 import bodyParser from 'koa-bodyparser';
-import z, { ZodError, ZodSchema } from 'zod';
+import { ZodError, ZodType } from 'zod';
 import zodRouter from './zod-router';
 
 export type Method =
@@ -68,12 +68,12 @@ export interface ZodContext<Headers, Params, Query, Body, Files> extends Context
 
 export type ValidationOptions<Headers, Params, Query, Body, Files, Response> = {
   continueOnError?: boolean;
-  headers?: ZodSchema<Headers, z.ZodTypeDef, any>;
-  body?: ZodSchema<Body, z.ZodTypeDef, any>;
-  params?: ZodSchema<Params, z.ZodTypeDef, any>;
-  query?: ZodSchema<Query, z.ZodTypeDef, any>;
-  files?: ZodSchema<Files, z.ZodTypeDef, any>;
-  response?: ZodSchema<Response, z.ZodTypeDef, any>;
+  headers?: ZodType<Headers, any>;
+  body?: ZodType<Body, any>;
+  params?: ZodType<Params, any>;
+  query?: ZodType<Query, any>;
+  files?: ZodType<Files, any>;
+  response?: ZodType<Response, any>;
 };
 
 export type ZodMiddleware<S, H, P, Q, B, F, R = Response['ctx']> =

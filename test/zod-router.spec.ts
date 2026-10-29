@@ -739,7 +739,13 @@ describe('zodRouter', () => {
         handler: [
           async (ctx, next) => {
             if (ctx.invalid.error) {
-              ctx.body = { error: ctx.invalid };
+              ctx.body = {
+                error: {
+                  body: ctx.invalid.body?.issues,
+                  headers: ctx.invalid.headers?.issues,
+                  query: ctx.invalid.query?.issues,
+                },
+              };
               ctx.status = 420;
             } else {
               await next();
@@ -763,9 +769,9 @@ describe('zodRouter', () => {
         .post('/?query_test=whoops')
         .send({ test: [1, 2, 3] });
 
-      assert(res.body?.error.body.issues.length === 3);
-      assert(res.body?.error.query.issues.length === 1);
-      assert(res.body?.error.headers.issues.length === 1);
+      assert(res.body?.error.body.length === 3);
+      assert(res.body?.error.query.length === 1);
+      assert(res.body?.error.headers.length === 1);
       assert(res.status === 420);
     });
 
@@ -778,7 +784,13 @@ describe('zodRouter', () => {
         handler: [
           async (ctx, next) => {
             if (ctx.invalid.error) {
-              ctx.body = { error: ctx.invalid };
+              ctx.body = {
+                error: {
+                  body: ctx.invalid.body?.issues,
+                  headers: ctx.invalid.headers?.issues,
+                  query: ctx.invalid.query?.issues,
+                },
+              };
               ctx.status = 420;
             } else {
               await next();
@@ -802,9 +814,9 @@ describe('zodRouter', () => {
         .post('/?query_test=whoops')
         .send({ test: [1, 2] });
 
-      assert(res.body?.error.body.issues.length === 2);
-      assert(res.body?.error.query.issues.length === 1);
-      assert(res.body?.error.headers.issues.length === 1);
+      assert(res.body?.error.body.length === 2);
+      assert(res.body?.error.query.length === 1);
+      assert(res.body?.error.headers.length === 1);
       assert(res.status === 420);
     });
 

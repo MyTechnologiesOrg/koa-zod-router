@@ -15,7 +15,7 @@ import { assertHandlers, assertPath, assertRouteFnSpec, assertUseSpec, methods, 
 import { validationMiddleware } from './validation-middleware';
 import { multipartParserMiddleware } from './multipart-parser-middleware';
 import { DefaultContext, DefaultState } from 'koa';
-import { ZodTypeAny } from 'zod';
+import { ZodType } from 'zod';
 
 const zodRouter = <RouterState = DefaultState>(opts?: RouterOpts) => {
   const _router = new KoaRouter<RouterState>(opts?.koaRouter);
@@ -98,12 +98,12 @@ const zodRouter = <RouterState = DefaultState>(opts?: RouterOpts) => {
    */
   function use<
     State = RouterState,
-    Headers = ZodTypeAny,
-    Params = ZodTypeAny,
-    Query = ZodTypeAny,
-    Body = ZodTypeAny,
-    Files = ZodTypeAny,
-    Response = ZodTypeAny,
+    Headers = ZodType,
+    Params = ZodType,
+    Query = ZodType,
+    Body = ZodType,
+    Files = ZodType,
+    Response = ZodType,
   >(spec: UseSpec<State, Headers, Params, Query, Body, Files, Response>): KoaRouter;
 
   function use() {
