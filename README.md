@@ -217,6 +217,17 @@ Each failing request parameter (or the response) is sent as `{ issues, name }`:
 }
 ```
 
+### Route paths
+
+Routes are matched by [@koa/router][] 15, which uses path-to-regexp v8 syntax:
+
+- Named parameters: `/users/:id`
+- Optional segments: `/users{/:id}` (replaces `/users/:id?`)
+- Wildcards need a name: `/files/*path` or `/files{/*path}`
+- Regex patterns inside parameters, such as `/users/:id(\\d+)`, are no longer supported. Validate the parameter with a `params` schema instead, for example `params: z.object({ id: z.coerce.number().int() })`.
+
+RegExp paths still work, but their capture groups are on `ctx.captures` rather than `ctx.request.params`. See the [@koa/router migration guide](https://github.com/koajs/router/blob/master/FULL_MIGRATION_TO_V15%2B.md) for details.
+
 ### Validated request data
 
 After validation succeeds, `ctx.request.body`, `ctx.request.query`, and `ctx.request.files` hold exactly the parsed output of their schemas. Keys the schema strips, such as unknown keys in a `z.object()`, are removed, so they can't reach your handler. Headers and route params keep values the schema doesn't cover, because other middleware relies on them.

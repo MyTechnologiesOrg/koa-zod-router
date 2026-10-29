@@ -1,5 +1,5 @@
 import bodyParser from 'koa-bodyparser';
-import KoaRouter, { ParamMiddleware } from '@koa/router';
+import KoaRouter, { AllowedMethodsOptions, RouterMiddleware, RouterParameterMiddleware, UrlOptions } from '@koa/router';
 import {
   Method,
   RegisterSpec,
@@ -43,7 +43,7 @@ const zodRouter = <RouterState = DefaultState>(opts?: RouterOpts) => {
     return _router.all(...arguments);
   }
 
-  function allowedMethods(options?: KoaRouter.RouterAllowedMethodsOptions) {
+  function allowedMethods(options?: AllowedMethodsOptions) {
     return _router.allowedMethods(options);
   }
 
@@ -55,7 +55,7 @@ const zodRouter = <RouterState = DefaultState>(opts?: RouterOpts) => {
     return _router.middleware();
   }
 
-  function param(path: string, middleware: ParamMiddleware) {
+  function param(path: string, middleware: RouterParameterMiddleware<RouterState>) {
     return _router.param(path, middleware);
   }
 
@@ -75,7 +75,7 @@ const zodRouter = <RouterState = DefaultState>(opts?: RouterOpts) => {
     return _router.routes();
   }
 
-  function url(name: string, params?: any, options?: KoaRouter.UrlOptionsQuery) {
+  function url(name: string, params?: any, options?: UrlOptions) {
     return _router.url(name, params, options);
   }
 
@@ -87,7 +87,7 @@ const zodRouter = <RouterState = DefaultState>(opts?: RouterOpts) => {
    * "down" the middleware stack.
    */
   function use<State = RouterState, Context = DefaultContext>(
-    ...middleware: Array<KoaRouter.Middleware<State, Context>>
+    ...middleware: Array<RouterMiddleware<State, Context>>
   ): KoaRouter<State, Context>;
   /**
    * Use given middleware.
@@ -98,7 +98,7 @@ const zodRouter = <RouterState = DefaultState>(opts?: RouterOpts) => {
    */
   function use<State = RouterState, Context = DefaultContext>(
     path: string | string[] | RegExp,
-    ...middleware: Array<KoaRouter.Middleware<State, Context>>
+    ...middleware: Array<RouterMiddleware<State, Context>>
   ): KoaRouter;
 
   /**
@@ -177,7 +177,12 @@ const zodRouter = <RouterState = DefaultState>(opts?: RouterOpts) => {
 
     const name = spec.name ? spec.name : null;
 
-    _router.register(spec.path, methodsParam, specMiddleware(spec, true), { name });
+    // @koa/router 15 only treats a path as a RegExp when told to, as its own
+    // method helpers do.
+    _router.register(spec.path, methodsParam, specMiddleware(spec, true), {
+      name,
+      pathAsRegExp: spec.path instanceof RegExp,
+    });
 
     return _router;
   }

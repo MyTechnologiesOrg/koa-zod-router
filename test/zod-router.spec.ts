@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import { createRouteSpec, methods, zFile } from '../src/util';
-import KoaRouter from '@koa/router';
+import { Layer, RouterContext } from '@koa/router';
 import zodRouter from '../src/zod-router';
 import { ValidationErrorHandler } from '../src/types';
 import { createApp, request } from './test-utils';
@@ -36,7 +36,7 @@ describe('zodRouter', () => {
         ],
       });
 
-      const route = router.route('post-example') as KoaRouter.Layer;
+      const route = router.route('post-example') as Layer;
 
       assert(route?.stack.length === 3);
       assert(route?.methods[0] === 'POST');
@@ -354,6 +354,48 @@ describe('zodRouter', () => {
           assert(res.status === 400);
         });
     });
+
+    it('should support RegExp paths in method helpers and register', async () => {
+      const router = zodRouter();
+
+      router.use({
+        path: '/re',
+        handler: async (ctx, next) => {
+          ctx.set('x-use', 'yes');
+          await next();
+        },
+      });
+
+      router.get(/^\/re\/method\/(\d+)$/, (ctx) => {
+        // @koa/router 15 exposes RegExp capture groups only on ctx.captures
+        const { captures } = ctx as unknown as RouterContext;
+        ctx.body = { route: 'method', id: captures?.[0] };
+      });
+
+      router.register({
+        method: 'post',
+        path: /^\/re\/register$/,
+        handler: (ctx) => {
+          ctx.body = { route: 'register', hello: ctx.request.body.hello };
+        },
+        validate: { body: z.object({ hello: z.string() }) },
+      });
+
+      const app = createApp(router);
+
+      const methodRes = await request(app).get('/re/method/42');
+      assert(methodRes.status === 200);
+      assert.deepStrictEqual(methodRes.body, { route: 'method', id: '42' });
+      assert(methodRes.headers['x-use'] === 'yes');
+
+      const registerRes = await request(app).post('/re/register').send({ hello: 'world' });
+      assert(registerRes.status === 200);
+      assert.deepStrictEqual(registerRes.body, { route: 'register', hello: 'world' });
+      assert(registerRes.headers['x-use'] === 'yes');
+
+      const missRes = await request(app).get('/re/method/abc');
+      assert(missRes.status === 404);
+    });
   });
 
   describe('delegated methods', () => {
@@ -362,7 +404,7 @@ describe('zodRouter', () => {
 
       router.all('example', '/test', () => {});
 
-      const route = router.route('example') as KoaRouter.Layer;
+      const route = router.route('example') as Layer;
       assert(route?.methods.length > 1);
     });
 
@@ -408,7 +450,7 @@ describe('zodRouter', () => {
         handler: () => {},
       });
 
-      const route = router.route('example') as KoaRouter.Layer;
+      const route = router.route('example') as Layer;
       assert(route?.opts.prefix === '/test-prefix');
     });
 

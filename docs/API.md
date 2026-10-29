@@ -8,7 +8,7 @@
 | ------------ | ------------------- | ---------------------------------------------------------------------------------------- |
 | [bodyParser] | <code>Object</code> | koa-bodyparser [options](https://github.com/koajs/bodyparser#options)                    |
 | [formidable] | <code>Object</code> | formidable [options](https://github.com/node-formidable/formidable#options)              |
-| [koaRouter]  | <code>Object</code> | @koa/router [options](https://github.com/koajs/router/blob/master/API.md#new-routeropts) |
+| [koaRouter]  | <code>Object</code> | @koa/router [options](https://github.com/koajs/router#router-constructor) |
 | [zodRouter]  | <code>Object</code> | koa-zod-router [options](#koa-zod-router-options)                                        |
 
 ### zodRouter opts
@@ -20,7 +20,7 @@
 | [exposeResponseErrors]   | <code>Boolean</code>  | `false`     | Send ZodErrors caused by the server in response body                                               |
 | [validationErrorHandler] | <code>Function</code> | `undefined` | Set a middleware function that will immediately run after `koa-zod-router's` validation middleware |
 
-Please see [@koa/router](https://github.com/koajs/router/blob/master/API.md) docs for any methods not mentioned in this doc. Only methods that have been wrapped or overridden are mentioned here. All other methods are delegated to koa-router.
+Please see [@koa/router](https://github.com/koajs/router#api-documentation) docs for any methods not mentioned in this doc. Only methods that have been wrapped or overridden are mentioned here. All other methods are delegated to koa-router.
 
 **Example**:
 
@@ -41,7 +41,7 @@ Additionally, `router.all()` can be used to match against all methods. However v
 | path       | <code>String</code>                 | route path                                                                                                            |
 | handler    | <code>function \| function[]</code> | handler function(s)                                                                                                   |
 | [name]     | <code>String</code>                 | route name                                                                                                            |
-| [opts]     | <code>Object</code>                 | [KoaRouter.LayerOptions](https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/koa__router/index.d.ts) |
+| [opts]     | <code>Object</code>                 | [LayerOptions](https://github.com/koajs/router#available-types) |
 | [validate] | <code>Object</code>                 | [validation schema](#validation-schema)                                                                               |
 
 ```javascript
@@ -79,7 +79,7 @@ router
 | method     | <code>String \| String[]</code>     | HTTP verb(s)                                                                                                          |
 | handler    | <code>function \| function[]</code> | handler function(s)                                                                                                   |
 | [name]     | <code>String</code>                 | route name                                                                                                            |
-| [opts]     | <code>Object</code>                 | [KoaRouter.LayerOptions](https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/koa__router/index.d.ts) |
+| [opts]     | <code>Object</code>                 | [LayerOptions](https://github.com/koajs/router#available-types) |
 | [validate] | <code>Object</code>                 | [validation schema](#validation-schema)                                                                               |
 
 ```javascript
@@ -146,7 +146,7 @@ Utility function used for Importing/Exporting routes with type inference and val
 | [method]   | <code>String \| String[]</code>     | HTTP verb(s)                                                                                                          |
 | [pre]      | <code>function \| function[]</code> | pre-validation handler function(s)                                                                                    |
 | [name]     | <code>String</code>                 | route name                                                                                                            |
-| [opts]     | <code>Object</code>                 | [KoaRouter.LayerOptions](https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/koa__router/index.d.ts) |
+| [opts]     | <code>Object</code>                 | [LayerOptions](https://github.com/koajs/router#available-types) |
 | [validate] | <code>Object</code>                 | [validation schema](#validation-schema)                                                                               |
 
 **Example:**
