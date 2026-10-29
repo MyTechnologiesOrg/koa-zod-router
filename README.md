@@ -338,11 +338,12 @@ router.register({
 
 ## Feedback
 
-Found a bug?
-Please let me know in [Issues section](https://github.com/JakeFenley/koa-zod-router/issues).
-
-Have a question or idea?
-Please let me know in [Discussions section](https://github.com/JakeFenley/koa-zod-router/discussions).
+Found a bug or have an idea?
+Please let us know in [Issues section](https://github.com/MyTechnologiesOrg/koa-zod-router/issues).
 
 Found a vulnerability or other security issue?
-Please refer to [Security policy](https://github.com/JakeFenley/koa-zod-router/blob/main/SECURITY.md).
+Please refer to [Security policy](https://github.com/MyTechnologiesOrg/koa-zod-router/blob/main/SECURITY.md).
+
+## Attribution
+
+This is a fork of [koa-zod-router](https://github.com/JakeFenley/koa-zod-router) by Jake Fenley, forked from version 2.3.0 (November 2025). This fork is maintained independently by My Technology, Inc. and is not affiliated with the original project.
