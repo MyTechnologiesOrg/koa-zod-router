@@ -12,5 +12,6 @@
 
 Found a vulnerability?
 
-Please urgently inform me by
-[email](https://github.com/JakeFenley/koa-zod-router/blob/main/package.json#L21).
+Please report it privately through
+[GitHub private vulnerability reporting](https://github.com/MyTechnologiesOrg/koa-zod-router/security/advisories/new).
+Do not open a public issue.
