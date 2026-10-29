@@ -1,15 +1,26 @@
+import { unlink } from 'node:fs';
 import { DefaultContext, Next } from 'koa';
 import formidable from 'formidable';
 import { assertFormidableError } from './util';
 
-export const multipartParserMiddleware = (options?: formidable.Options) => {
+// Uploads are temp files for the lifetime of the request. Handlers that want to
+// keep one must move or copy it before the response finishes.
+const removeUploadedFiles = (files: formidable.Files) => {
+  Object.values(files)
+    .flat()
+    .forEach((file) => unlink(file.filepath, () => {}));
+};
+
+export const multipartParserMiddleware = (options?: formidable.Options, acceptFiles = true) => {
   return async (ctx: DefaultContext, next: Next) => {
-    if (!ctx.is('multipart')) {
+    // A request body can only be read once, so skip if an earlier spec parsed it.
+    if (!ctx.is('multipart') || ctx.request.files !== undefined) {
       await next();
       return;
     }
 
-    const form = formidable({ multiples: true, ...options });
+    // Without a files schema, drop file parts instead of writing them to disk.
+    const form = formidable({ multiples: true, ...options, ...(!acceptFiles && { filter: () => false }) });
 
     try {
       await new Promise<void>((resolve, reject) => {
@@ -21,6 +32,7 @@ export const multipartParserMiddleware = (options?: formidable.Options) => {
 
           ctx.request.body = fields;
           ctx.request.files = files;
+          ctx.res.once('close', () => removeUploadedFiles(files));
           resolve();
         });
       });

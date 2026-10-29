@@ -21,9 +21,21 @@ const zodRouter = <RouterState = DefaultState>(opts?: RouterOpts) => {
   const _router = new KoaRouter<RouterState>(opts?.koaRouter);
   _router.use(bodyParser(opts?.bodyParser));
 
-  if (opts?.zodRouter?.enableMultipart) {
-    _router.use(multipartParserMiddleware(opts?.formidable));
-  }
+  // Multipart parsing runs after `pre`, so guards there run before any upload
+  // is written to disk, and only specs that validate `files` keep file parts.
+  const specMiddleware = <S, H, P, Q, B, F, R>(
+    spec: Pick<UseSpec<S, H, P, Q, B, F, R>, 'pre' | 'handler' | 'validate'>,
+    parseMultipart: boolean,
+  ) =>
+    prepareMiddleware([
+      spec.pre,
+      opts?.zodRouter?.enableMultipart && parseMultipart
+        ? multipartParserMiddleware(opts.formidable, Boolean(spec.validate?.files))
+        : undefined,
+      validationMiddleware(spec.validate, opts?.zodRouter),
+      opts?.zodRouter?.validationErrorHandler,
+      spec.handler,
+    ]);
 
   // Delegated methods - preserves value of 'this' in KoaRouter
   function all() {
@@ -109,26 +121,14 @@ const zodRouter = <RouterState = DefaultState>(opts?: RouterOpts) => {
   function use() {
     if (assertUseSpec(arguments[0])) {
       const spec = arguments[0];
+      // A `use` spec covers many routes; only parse multipart when it validates
+      // the body or files, so each route's own `pre` runs before parsing.
+      const middleware = specMiddleware(spec, Boolean(spec.validate?.body || spec.validate?.files));
 
       if (assertPath(spec.path)) {
-        return _router.use(
-          spec.path,
-          ...prepareMiddleware([
-            spec.pre,
-            validationMiddleware(spec.validate, opts?.zodRouter),
-            opts?.zodRouter?.validationErrorHandler,
-            spec.handler,
-          ]),
-        );
+        return _router.use(spec.path, ...middleware);
       } else {
-        return _router.use(
-          ...prepareMiddleware([
-            spec.pre,
-            validationMiddleware(spec.validate, opts?.zodRouter),
-            opts?.zodRouter?.validationErrorHandler,
-            spec.handler,
-          ]),
-        );
+        return _router.use(...middleware);
       }
     }
 
@@ -177,17 +177,7 @@ const zodRouter = <RouterState = DefaultState>(opts?: RouterOpts) => {
 
     const name = spec.name ? spec.name : null;
 
-    _router.register(
-      spec.path,
-      methodsParam,
-      prepareMiddleware([
-        spec.pre,
-        validationMiddleware(spec.validate, opts?.zodRouter),
-        opts?.zodRouter?.validationErrorHandler,
-        spec.handler,
-      ]),
-      { name },
-    );
+    _router.register(spec.path, methodsParam, specMiddleware(spec, true), { name });
 
     return _router;
   }

@@ -217,6 +217,12 @@ Each failing request parameter (or the response) is sent as `{ issues, name }`:
 }
 ```
 
+### Validated request data
+
+After validation succeeds, `ctx.request.body`, `ctx.request.query`, and `ctx.request.files` hold exactly the parsed output of their schemas. Keys the schema strips, such as unknown keys in a `z.object()`, are removed, so they can't reach your handler. Headers and route params keep values the schema doesn't cover, because other middleware relies on them.
+
+If a `use` spec validates part of the body and later routes need the rest, use `z.looseObject()` in the `use` spec so other keys are kept.
+
 ### Type coercion
 
 When dealing with route parameters, query strings, and headers the incoming data will be parsed as strings to begin with. From a validation standpoint this can potentially be painful to deal with when dealing with things like `Date` in javascript. Luckily [zod] has a built in [coercion] method attached to its primitive data types to solve this!
@@ -288,6 +294,12 @@ fileRouter.register({
 });
 ```
 
+How uploads are handled:
+
+- Multipart requests are parsed after a route's `pre` middleware, so checks such as authentication there run before anything is written to disk. A `use` spec only parses multipart requests when it validates `body` or `files`.
+- Files are only saved for routes with a `files` schema. Other routes still receive the text fields in `ctx.request.body`.
+- Uploaded files are temporary and are deleted once the response finishes. To keep a file, move or copy it from its `filepath` before the response is sent.
+
 ## Custom Validation Error Handling
 `koa-zod-router` allows users to implement router-wide error handling or route specific error handling. 
 
@@ -316,6 +328,8 @@ const router = zodRouter({
 
 ### Route specific error handling
 By enabling `continueOnError` you can bypass the default error handling done by the router's validation middleware and handle the errors the way you see fit.
+
+When a request with invalid input continues, either with `continueOnError` or a `validationErrorHandler`, the `response` schema still applies to successful (2xx) responses. Error responses and redirects you send are not checked against it.
 
 ```js
 import zodRouter from 'koa-zod-router';
