@@ -1,0 +1,75 @@
+name: release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    env:
+      TURBO_TELEMETRY_DISABLED: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      - name: Install pnpm
+        run: npm install --global pnpm@7.33.7
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Test
+        run: pnpm test
+
+      - name: Calculate Semantic Version
+        id: version
+        uses: mathieudutour/github-tag-action@a22cf08638b34d5badda920f9daf6e72c477b07b # v6.2.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          release_branches: main
+          default_bump: minor
+          dry_run: true
+
+      # Consumers install from git tags (`github:MyTechnologiesOrg/koa-zod-router#semver:^3`),
+      # so the tag points at a commit that adds the built dist/ on top of main.
+      - name: Create Release Tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_TAG: ${{ steps.version.outputs.new_tag }}
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
+        run: |
+          npm version "$NEW_VERSION" --no-git-tag-version
+          git add --force dist package.json
+          git -c user.name="github-actions[bot]" \
+            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit --message "chore(release): $NEW_TAG"
+          git tag "$NEW_TAG"
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "refs/tags/$NEW_TAG"
+
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_TAG: ${{ steps.version.outputs.new_tag }}
+          CHANGELOG: ${{ steps.version.outputs.changelog }}
+        run: gh release create "$NEW_TAG" --repo "$GITHUB_REPOSITORY" --title "$NEW_TAG" --notes "$CHANGELOG" --verify-tag
