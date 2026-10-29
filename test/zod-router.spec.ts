@@ -2,7 +2,7 @@ import assert from 'assert';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, it } from 'node:test';
+import { describe, it } from 'mocha';
 import { createRouteSpec, methods, zFile } from '../src/util';
 import { Layer, RouterContext } from '@koa/router';
 import zodRouter from '../src/zod-router';
