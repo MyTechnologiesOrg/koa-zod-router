@@ -24,11 +24,15 @@ Inspired by koa-joi-router, this package aims to provide a similar feature-set w
 
 ## 🚀 Install
 
+This fork is installed from its git release tags rather than the npm registry:
+
 ```sh
-npm install koa-zod-router koa zod
+npm install koa-zod-router@github:MyTechnologiesOrg/koa-zod-router#semver:^3 koa zod
 ```
 
 Requires Node.js 24 or newer, [zod][] 4, and Koa 2. Version 2.x of this package supports Zod 3.
+
+Every push to `main` creates a release. The version is calculated from [Conventional Commits](https://www.conventionalcommits.org/) since the previous tag (`feat!:` or `fix!:` for a major, `feat:` for a minor, a minor by default), and the tag points at a commit that adds the built `dist/` on top of `main`.
 
 ## 🚦 Quickstart
 
