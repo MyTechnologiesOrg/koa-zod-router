@@ -44,7 +44,7 @@ jobs:
 
       - name: Calculate Semantic Version
         id: version
-        uses: mathieudutour/github-tag-action@a22cf08638b34d5badda920f9daf6e72c477b07b # v6.2.0
+        uses: mathieudutour/github-tag-action@af99e60ce8132224b8e6ebab5023449fe256ed46 # v7
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           release_branches: main
@@ -54,6 +54,7 @@ jobs:
       # Consumers install from git tags (`github:MyTechnologiesOrg/koa-zod-router#semver:^3`),
       # so the tag points at a commit that adds the built dist/ on top of main.
       - name: Create Release Tag
+        if: steps.version.outputs.new_tag != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NEW_TAG: ${{ steps.version.outputs.new_tag }}
@@ -68,6 +69,7 @@ jobs:
           git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "refs/tags/$NEW_TAG"
 
       - name: Create Release
+        if: steps.version.outputs.new_tag != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NEW_TAG: ${{ steps.version.outputs.new_tag }}
